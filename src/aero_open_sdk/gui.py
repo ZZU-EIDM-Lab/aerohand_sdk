@@ -61,19 +61,19 @@ BAUDS = [
 ]
 
 SLIDER_LABELS = [
-    "thumb_abduction",
-    "thumb_flex",
-    "thumb_tendon",
-    "index_finger",
-    "middle_finger",
-    "ring_finger",
-    "pinky_finger",
+    "拇指外展",
+    "拇指屈曲",
+    "拇指肌腱",
+    "食指",
+    "中指",
+    "无名指",
+    "小指",
 ]
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Chestnut Robotics – Aero Hand Open")
+        self.title("Aero Hand Open 上位机")
         self.geometry("900x620")
         self.minsize(860, 560)
         if sys.platform.startswith("win"):
@@ -85,11 +85,11 @@ class App(tk.Tk):
             self.attributes("-zoomed", True)
 
         try:
-            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "logo.png")
+            icon_path = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "logo.png")
             icon_img = tk.PhotoImage(file=icon_path)
             self.iconphoto(True, icon_img)
         except Exception as e:
-            print(f"Could not set window icon: {e}")
+            print(f"设置窗口图标失败：{e}")
 
         # runtime state
         self.hand: AeroHand | None = None
@@ -110,69 +110,73 @@ class App(tk.Tk):
         top.pack(side=tk.TOP, fill=tk.X)
 
         # Port + refresh
-        ttk.Label(top, text="Port:").pack(side=tk.LEFT)
+        ttk.Label(top, text="串口：").pack(side=tk.LEFT)
         self.port_cmb = ttk.Combobox(top, textvariable=self.port_var, width=20, state="readonly")
         self.port_cmb.pack(side=tk.LEFT, padx=(4, 8))
-        ttk.Button(top, text="Refresh", command=self._refresh_ports).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Button(top, text="刷新", command=self._refresh_ports).pack(side=tk.LEFT, padx=(0, 12))
 
         # Baud select
-        ttk.Label(top, text="Baud:").pack(side=tk.LEFT)
+        ttk.Label(top, text="波特率：").pack(side=tk.LEFT)
         self.baud_cmb = ttk.Combobox(top, width=10, state="readonly",
                                      values=[str(b) for b in BAUDS], textvariable=self.baud_var)
         self.baud_cmb.set(str(self.baud_var.get()))
         self.baud_cmb.pack(side=tk.LEFT, padx=(4, 12))
 
         # Connect / Disconnect
-        self.btn_connect = ttk.Button(top, text="Connect", command=self.on_connect)
+        self.btn_connect = ttk.Button(top, text="连接", command=self.on_connect)
         self.btn_connect.pack(side=tk.LEFT, padx=(0, 8))
-        self.btn_disc = ttk.Button(top, text="Disconnect", command=self.on_disconnect, state=tk.DISABLED)
+        self.btn_disc = ttk.Button(top, text="断开", command=self.on_disconnect, state=tk.DISABLED)
         self.btn_disc.pack(side=tk.LEFT, padx=(0, 16))
         
         # Streaming rate
-        ttk.Label(top, text="Rate (Hz):").pack(side=tk.LEFT)
+        ttk.Label(top, text="发送频率 (Hz)：").pack(side=tk.LEFT)
         self.rate_spin = ttk.Spinbox(top, from_=1, to=200, width=6)
         self.rate_spin.delete(0, tk.END)
         self.rate_spin.insert(0, "50")
         self.rate_spin.pack(side=tk.LEFT, padx=(4, 0))
 
-        # ---- Commands row
+        # ---- Commands
         cmd = ttk.Frame(self, padding=(10, 4))
         cmd.pack(side=tk.TOP, fill=tk.X)
+        cmd_main = ttk.Frame(cmd)
+        cmd_main.pack(side=tk.TOP, fill=tk.X)
+        cmd_query = ttk.Frame(cmd)
+        cmd_query.pack(side=tk.TOP, fill=tk.X, pady=(4, 0))
 
-        self.btn_homing = ttk.Button(cmd, text="Homing", command=self.on_homing, state=tk.DISABLED)
+        self.btn_homing = ttk.Button(cmd_main, text="回零", command=self.on_homing, state=tk.DISABLED)
         self.btn_homing.pack(side=tk.LEFT, padx=(0, 10))
 
-        self.btn_setid = ttk.Button(cmd, text="Set ID", command=self.on_set_id, state=tk.DISABLED)
+        self.btn_setid = ttk.Button(cmd_main, text="设置 ID", command=self.on_set_id, state=tk.DISABLED)
         self.btn_setid.pack(side=tk.LEFT, padx=(0, 10))
 
-        self.btn_trim = ttk.Button(cmd, text="Trim Servo", command=self.on_trim, state=tk.DISABLED)
+        self.btn_trim = ttk.Button(cmd_main, text="舵机微调", command=self.on_trim, state=tk.DISABLED)
         self.btn_trim.pack(side=tk.LEFT, padx=(0, 10))
 
-        self.btn_flash = ttk.Button(cmd, text="Upload Firmware", command=self.on_flash)
+        self.btn_flash = ttk.Button(cmd_main, text="烧录固件", command=self.on_flash)
         self.btn_flash.pack(side=tk.LEFT, padx=(0, 10))
 
         # Zero All Button
-        self.btn_zero = ttk.Button(cmd, text="Set to Open Position", command=self.on_zero_all, state=tk.DISABLED)
+        self.btn_zero = ttk.Button(cmd_main, text="张开手掌", command=self.on_zero_all, state=tk.DISABLED)
         self.btn_zero.pack(side=tk.LEFT, padx=(0, 10))
 
         #Set Speed Button
-        self.btn_set_speed = ttk.Button(cmd, text="Set Speed", command=self.on_set_speed, state=tk.DISABLED)
+        self.btn_set_speed = ttk.Button(cmd_main, text="设置速度", command=self.on_set_speed, state=tk.DISABLED)
         self.btn_set_speed.pack(side=tk.LEFT, padx=(0, 10))
 
         #Set Torque Button
-        self.btn_set_torque = ttk.Button(cmd, text="Set Torque", command=self.on_set_torque, state=tk.DISABLED)
+        self.btn_set_torque = ttk.Button(cmd_main, text="设置力矩", command=self.on_set_torque, state=tk.DISABLED)
         self.btn_set_torque.pack(side=tk.LEFT, padx=(0, 10))
 
         # GET buttons
-        self.btn_get_pos  = ttk.Button(cmd, text="GET_POS",  command=self.on_get_pos,  state=tk.DISABLED)
-        self.btn_get_vel  = ttk.Button(cmd, text="GET_VEL",  command=self.on_get_vel,  state=tk.DISABLED)
-        self.btn_get_cur  = ttk.Button(cmd, text="GET_CURR", command=self.on_get_cur,  state=tk.DISABLED)
-        self.btn_get_temp = ttk.Button(cmd, text="GET_TEMP", command=self.on_get_temp, state=tk.DISABLED)
-        self.btn_get_all = ttk.Button(cmd, text="GET_ALL", command=self.on_get_all, state=tk.DISABLED)
+        self.btn_get_pos  = ttk.Button(cmd_query, text="读取位置", command=self.on_get_pos, state=tk.DISABLED)
+        self.btn_get_vel  = ttk.Button(cmd_query, text="读取速度", command=self.on_get_vel, state=tk.DISABLED)
+        self.btn_get_cur  = ttk.Button(cmd_query, text="读取电流", command=self.on_get_cur, state=tk.DISABLED)
+        self.btn_get_temp = ttk.Button(cmd_query, text="读取温度", command=self.on_get_temp, state=tk.DISABLED)
+        self.btn_get_all = ttk.Button(cmd_query, text="读取全部", command=self.on_get_all, state=tk.DISABLED)
         self.btn_calibrate_mid = ttk.Button(
-            cmd, text="Calibrate Mid", command=self.on_calibrate_mid, state=tk.DISABLED
+            cmd_query, text="校准中位", command=self.on_calibrate_mid, state=tk.DISABLED
         )
-        self.btn_get_pos.pack(side=tk.LEFT, padx=(20, 6))
+        self.btn_get_pos.pack(side=tk.LEFT, padx=(0, 6))
         self.btn_get_vel.pack(side=tk.LEFT, padx=6)
         self.btn_get_cur.pack(side=tk.LEFT, padx=6)
         self.btn_get_temp.pack(side=tk.LEFT, padx=6)
@@ -180,7 +184,7 @@ class App(tk.Tk):
         self.btn_calibrate_mid.pack(side=tk.LEFT, padx=6)
 
         # ---- Sliders (7)
-        self.grp = ttk.LabelFrame(self, text="Sliders (send CTRL_POS payload)", padding=10)
+        self.grp = ttk.LabelFrame(self, text="关节位置（持续发送 CTRL_POS）", padding=10)
         self.grp.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=(6, 10))
 
         self.slider_vars = []
@@ -188,7 +192,7 @@ class App(tk.Tk):
         mono_font = ("Consolas", 10)
         for i, name in enumerate(SLIDER_LABELS):
             row = ttk.Frame(self.grp)
-            row.pack(fill=tk.X, pady=5)
+            row.pack(fill=tk.X, pady=1)
             ttk.Label(row, text=f"{i} – {name}", width=22).pack(side=tk.LEFT, padx=(0, 8))
             min_lbl = ttk.Label(row, text="0.000", width=8, font=mono_font)
             min_lbl.pack(side=tk.LEFT)
@@ -206,32 +210,32 @@ class App(tk.Tk):
         self.torque_slider_var = tk.DoubleVar(value=0.0)
         self.torque_slider = tk.Scale(self.torque_frame, from_=0.0, to=1.0, orient=tk.HORIZONTAL, length=600,
                                       resolution=0.001, variable=self.torque_slider_var, showvalue=True,
-                                      label="Torque (0.000 - 1.000)", command=self._on_torque_slider)
+                                      label="力矩 (0.000 - 1.000)", command=self._on_torque_slider)
         self.torque_slider.pack(side=tk.LEFT, padx=20, pady=10)
-        self.btn_back_joint = ttk.Button(self.torque_frame, text="Back to Position Control", command=self.disable_torque_control)
+        self.btn_back_joint = ttk.Button(self.torque_frame, text="返回位置控制", command=self.disable_torque_control)
         self.btn_back_joint.pack(side=tk.LEFT, padx=20, pady=10)
         self.torque_frame.pack_forget()
 
         # Torque Control Button below sliders
-        self.btn_torque_control = ttk.Button(self, text="Torque Control", command=self.on_torque_control, state=tk.NORMAL)
+        self.btn_torque_control = ttk.Button(self, text="力矩控制", command=self.on_torque_control, state=tk.NORMAL)
         self.btn_torque_control.pack(side=tk.TOP, pady=(0, 10))
 
-        # ---- RX log
-        rx = ttk.LabelFrame(self, text="RX Log", padding=10)
-        rx.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
-        self.rx_text = tk.Text(rx, height=10)
-        self.rx_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        sb = ttk.Scrollbar(rx, command=self.rx_text.yview)
-        sb.pack(side=tk.RIGHT, fill=tk.Y)
-        self.rx_text.configure(yscrollcommand=sb.set)
-
         # ---- statusbar
-        self.status_var = tk.StringVar(value="Disconnected")
+        self.status_var = tk.StringVar(value="未连接")
         status_bar = ttk.Frame(self)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 6))
 
         ttk.Label(status_bar, textvariable=self.status_var, anchor="w").pack(side=tk.LEFT, fill=tk.X, expand=True)
-        ttk.Button(status_bar, text="Clear Log", command=self._clear_rx).pack(side=tk.RIGHT)
+        ttk.Button(status_bar, text="清空日志", command=self._clear_rx).pack(side=tk.RIGHT)
+
+        # ---- RX log
+        rx = ttk.LabelFrame(self, text="接收日志", padding=10)
+        rx.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        self.rx_text = tk.Text(rx, height=5)
+        self.rx_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb = ttk.Scrollbar(rx, command=self.rx_text.yview)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        self.rx_text.configure(yscrollcommand=sb.set)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # ------------- helpers -------------
@@ -258,11 +262,11 @@ class App(tk.Tk):
     def on_torque_control(self):
         # Stop CTRL_POS streaming and disable joint sliders
         self.control_paused = True
-        self.set_status("Torque control mode: stopped CTRL_POS streaming")
+        self.set_status("力矩控制模式：已停止发送 CTRL_POS")
         for scale in self.slider_widgets:
             scale.configure(state=tk.DISABLED)
         self.btn_calibrate_mid.configure(state=tk.DISABLED)
-        self.grp.configure(text="Sliders (CTRL_POS disabled)")
+        self.grp.configure(text="关节位置（CTRL_POS 已暂停）")
         # Show torque slider
         self.torque_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(6, 10))
         self.torque_slider.configure(state=tk.NORMAL)
@@ -271,11 +275,11 @@ class App(tk.Tk):
         t_val = int(float(val) * 1000)
         try:
             self.hand.ctrl_torque([t_val]*7)
-            self.log(f"[TX] CTRL_TOR sent: {t_val}")
-            self.set_status(f"Torque set to {t_val}")
+            self.log(f"[TX] 已发送 CTRL_TOR：{t_val}")
+            self.set_status(f"力矩已设置为 {t_val}")
         except Exception as e:
-            self.log(f"[err] Torque set failed: {e}")
-            self.set_status("Torque set failed")
+            self.log(f"[错误] 设置力矩失败：{e}")
+            self.set_status("设置力矩失败")
 
     def disable_torque_control(self):
         # Hide torque slider and re-enable joint sliders
@@ -284,7 +288,7 @@ class App(tk.Tk):
         for scale in self.slider_widgets:
             scale.configure(state=tk.NORMAL)
         self.btn_calibrate_mid.configure(state=tk.NORMAL)
-        self.grp.configure(text="Sliders (send CTRL_POS payload)")
+        self.grp.configure(text="关节位置（持续发送 CTRL_POS）")
 
     # ------------- connect/disconnect -------------
     def on_connect(self):
@@ -292,14 +296,14 @@ class App(tk.Tk):
             return False  # Already connected
         port = self.port_var.get().strip()
         if not port:
-            messagebox.showerror("Error", "Select a serial port.")
+            messagebox.showerror("错误", "请选择串口。")
             return False
         try:
             self.tx_rate_hz = float(self.rate_spin.get().strip())
             if self.tx_rate_hz <= 0:
                 raise ValueError
         except Exception:
-            messagebox.showerror("Error", "Rate must be a positive number.")
+            messagebox.showerror("错误", "发送频率必须是正数。")
             return False
 
         baud = int(self.baud_var.get())
@@ -316,12 +320,12 @@ class App(tk.Tk):
                       self.btn_get_pos, self.btn_get_vel, self.btn_get_cur, self.btn_get_temp, self.btn_get_all, self.btn_calibrate_mid):
                 b.configure(state=tk.NORMAL)
 
-            self.set_status(f"Connected to {port} @ {baud}")
-            self.log(f"[info] Connected {port} @ {baud}")
+            self.set_status(f"已连接到 {port}，波特率 {baud}")
+            self.log(f"[信息] 已连接到 {port}，波特率 {baud}")
             return True  # Success!
         except Exception as e:
             self.hand = None
-            messagebox.showerror("Open failed", str(e))
+            messagebox.showerror("打开串口失败", str(e))
             return False  # Failure
 
     def on_disconnect(self):
@@ -349,8 +353,8 @@ class App(tk.Tk):
         for b in (self.btn_zero,self.btn_homing, self.btn_setid, self.btn_trim,self.btn_set_speed,self.btn_set_torque,
                   self.btn_get_pos, self.btn_get_vel, self.btn_get_cur, self.btn_get_temp, self.btn_get_all, self.btn_calibrate_mid):
             b.configure(state=tk.DISABLED)
-        self.set_status("Disconnected")
-        self.log("[info] Disconnected")
+        self.set_status("未连接")
+        self.log("[信息] 已断开连接")
 
     # ------------- TX streaming (CTRL_POS) -------------
     def _tx_loop(self):
@@ -365,7 +369,7 @@ class App(tk.Tk):
                 try:
                     self.hand.set_joint_positions(joint_values)
                 except Exception as e:
-                    self.log(f"[TX error] {e}")
+                    self.log(f"[发送错误] {e}")
             # pacing
             next_t += period
             to_sleep = next_t - time.perf_counter()
@@ -381,15 +385,15 @@ class App(tk.Tk):
         def worker():
             try:
                 self.control_paused = True
-                self.set_status("Homing in process… waiting for ACK")
-                self.log("[TX] HOMING sent (0x01). Waiting for 16-byte ACK…")
+                self.set_status("正在回零…等待确认")
+                self.log("[TX] 已发送 HOMING (0x01)，等待 16 字节确认包…")
                 ok = self.hand.send_homing(timeout_s=175.0)
                 if ok:
-                    self.log("[ACK] HOMING complete.")
-                    self.set_status("Homing complete")
+                    self.log("[ACK] 回零完成")
+                    self.set_status("回零完成")
             except Exception as e:
-                self.log(f"[err] HOMING failed: {e}")
-                self.set_status("Homing failed")
+                self.log(f"[错误] 回零失败：{e}")
+                self.set_status("回零失败")
             finally:
                 self.control_paused = False
 
@@ -398,10 +402,10 @@ class App(tk.Tk):
     def on_set_id(self):
         if not self.hand:
             return
-        new_id = simpledialog.askinteger("Set ID", "Enter new ID (0..253):", minvalue=0, maxvalue=253, parent=self)
+        new_id = simpledialog.askinteger("设置 ID", "请输入新 ID (0..253)：", minvalue=0, maxvalue=253, parent=self)
         if new_id is None:
             return
-        cur_lim = simpledialog.askinteger("Current Limit", "Enter current limit (0..1023):",
+        cur_lim = simpledialog.askinteger("电流限制", "请输入电流限制 (0..1023)：",
                                           minvalue=0, maxvalue=1023, initialvalue=1023, parent=self)
         if cur_lim is None:
             return
@@ -409,14 +413,14 @@ class App(tk.Tk):
         def worker():
             try:
                 self.control_paused = True
-                self.set_status("Setting ID… waiting for ACK")
-                self.log(f"[TX] SET_ID sent (id={new_id}, current={cur_lim})")
+                self.set_status("正在设置 ID…等待确认")
+                self.log(f"[TX] 已发送 SET_ID（新 ID={new_id}，电流限制={cur_lim}）")
                 ack = self.hand.set_id(new_id, cur_lim)  # dict with Old_id, New_id, Current_limit
-                self.log(f"[ACK] SET_ID: old={ack['Old_id']} new={ack['New_id']} current_limit={ack['Current_limit']}")
-                self.set_status("Set ID complete")
+                self.log(f"[ACK] SET_ID：旧 ID={ack['Old_id']}，新 ID={ack['New_id']}，电流限制={ack['Current_limit']}")
+                self.set_status("ID 设置完成")
             except Exception as e:
-                self.log(f"[err] SET_ID failed: {e}")
-                self.set_status("Set ID failed")
+                self.log(f"[错误] 设置 ID 失败：{e}")
+                self.set_status("设置 ID 失败")
             finally:
                 self.control_paused = False
 
@@ -425,11 +429,11 @@ class App(tk.Tk):
     def on_set_speed(self):
         if not self.hand:
             return
-        ch = simpledialog.askinteger("Set Speed", "Servo ID / channel (0..6):",
+        ch = simpledialog.askinteger("设置速度", "舵机 ID / 通道 (0..6)：",
                                      minvalue=0, maxvalue=6, parent=self)
         if ch is None:
             return
-        speed = simpledialog.askinteger("Set Speed", "Speed (0..32766):",
+        speed = simpledialog.askinteger("设置速度", "速度 (0..32766)：",
                                        minvalue=0, maxvalue=32766, initialvalue=32766, parent=self)
         if speed is None:
             return
@@ -437,14 +441,14 @@ class App(tk.Tk):
         def worker():
             try:
                 self.control_paused = True
-                self.set_status("Setting Speed… waiting for ACK")
-                self.log(f"[TX] SET_SPEED sent (ch={ch}, speed={speed})")
+                self.set_status("正在设置速度…等待确认")
+                self.log(f"[TX] 已发送 SET_SPEED（通道={ch}，速度={speed}）")
                 ack = self.hand.set_speed(ch, speed)  # dict with Servo ID, Speed
-                self.log(f"[ACK] SET_SPEED: id={ack['Servo ID']} speed={ack['Speed']}")
-                self.set_status("Set Speed complete")
+                self.log(f"[ACK] SET_SPEED：舵机 ID={ack['Servo ID']}，速度={ack['Speed']}")
+                self.set_status("速度设置完成")
             except Exception as e:
-                self.log(f"[err] SET_SPEED failed: {e}")
-                self.set_status("Set Speed failed")
+                self.log(f"[错误] 设置速度失败：{e}")
+                self.set_status("设置速度失败")
             finally:
                 self.control_paused = False
 
@@ -453,26 +457,26 @@ class App(tk.Tk):
     def on_set_torque(self):
         if not self.hand:
             return
-        ch = simpledialog.askinteger("Set Torque", "Servo ID / channel (0..6):",
+        ch = simpledialog.askinteger("设置力矩", "舵机 ID / 通道 (0..6)：",
                                      minvalue=0, maxvalue=6, parent=self)
         if ch is None:
             return
-        torque = simpledialog.askinteger("Set Torque", "Torque (0..1000):",
-                                        minvalue=0, maxvalue=1000, initialvalue=1023, parent=self)
+        torque = simpledialog.askinteger("设置力矩", "力矩 (0..1000)：",
+                                        minvalue=0, maxvalue=1000, initialvalue=1000, parent=self)
         if torque is None:
             return
 
         def worker():
             try:
                 self.control_paused = True
-                self.set_status("Setting Torque… waiting for ACK")
-                self.log(f"[TX] SET_TORQUE sent (ch={ch}, torque={torque})")
+                self.set_status("正在设置力矩…等待确认")
+                self.log(f"[TX] 已发送 SET_TORQUE（通道={ch}，力矩={torque}）")
                 ack = self.hand.set_torque(ch, torque)  # dict with Servo ID, Torque
-                self.log(f"[ACK] SET_TORQUE: id={ack['Servo ID']} torque={ack['Torque']}")
-                self.set_status("Set Torque complete")
+                self.log(f"[ACK] SET_TORQUE：舵机 ID={ack['Servo ID']}，力矩={ack['Torque']}")
+                self.set_status("力矩设置完成")
             except Exception as e:
-                self.log(f"[err] SET_TORQUE failed: {e}")
-                self.set_status("Set Torque failed")
+                self.log(f"[错误] 设置力矩失败：{e}")
+                self.set_status("设置力矩失败")
             finally:
                 self.control_paused = False
 
@@ -489,11 +493,11 @@ class App(tk.Tk):
                     var.set(0.0)  # Set to 0.0 for normalized slider
                 joint_pos = list(self.hand.joint_lower_limits)
                 self.hand.set_joint_positions(joint_pos)
-                self.log("[TX] ZERO_ALL via CTRL_POS (joint lower limits)")
-                self.set_status("Zeroed (lower limits sent; sliders reset)")
+                self.log("[TX] 已通过 CTRL_POS 发送各关节下限（张开手掌）")
+                self.set_status("已发送张开位置，滑块已复位")
             except Exception as e:
-                self.log(f"[err] ZERO_ALL: {e}")
-                self.set_status("Zero All failed")
+                self.log(f"[错误] 张开手掌失败：{e}")
+                self.set_status("张开手掌失败")
             finally:
                 time.sleep(0.05)
                 self.control_paused = False
@@ -503,11 +507,11 @@ class App(tk.Tk):
     def on_trim(self):
         if not self.hand:
             return
-        ch = simpledialog.askinteger("Trim Servo", "Servo ID / channel (0..6):",
+        ch = simpledialog.askinteger("舵机微调", "舵机 ID / 通道 (0..6)：",
                                      minvalue=0, maxvalue=6, parent=self)
         if ch is None:
             return
-        deg = simpledialog.askinteger("Trim Servo", "Degrees (-360..360):",
+        deg = simpledialog.askinteger("舵机微调", "角度 (-360..360)：",
                                       minvalue=-360, maxvalue=360, initialvalue=0, parent=self)
         if deg is None:
             return
@@ -515,17 +519,17 @@ class App(tk.Tk):
         def worker():
             try:
                 self.control_paused = True
-                self.set_status("Trimming… waiting for ACK")
-                self.log(f"[TX] TRIM sent (ch={ch}, deg={deg})")
+                self.set_status("正在微调舵机…等待确认")
+                self.log(f"[TX] 已发送 TRIM（通道={ch}，角度={deg}）")
                 ack = self.hand.trim_servo(ch, deg)
                 self.log(
-                    f"[ACK] TRIM: id={ack['Servo ID']} "
-                    f"extend_raw={ack['Extend Raw']} present_raw={ack['Present Raw']}"
+                    f"[ACK] TRIM：舵机 ID={ack['Servo ID']}，"
+                    f"扩展原始值={ack['Extend Raw']}，当前位置原始值={ack['Present Raw']}"
                 )
-                self.set_status("Trim complete")
+                self.set_status("舵机微调完成")
             except Exception as e:
-                self.log(f"[err] TRIM failed: {e}")
-                self.set_status("Trim failed")
+                self.log(f"[错误] 舵机微调失败：{e}")
+                self.set_status("舵机微调失败")
             finally:
                 self.control_paused = False
 
@@ -535,17 +539,16 @@ class App(tk.Tk):
         if not self.hand:
             return
         ch = simpledialog.askinteger(
-            "Calibrate Mid", "Servo ID / channel (0..6):",
+            "校准中位", "舵机 ID / 通道 (0..6)：",
             minvalue=0, maxvalue=6, parent=self,
         )
         if ch is None:
             return
         confirmed = messagebox.askyesno(
-            "Calibrate Mid",
-            "The selected actuator's current physical position will become its middle position.\n\n"
-            "The slider will stay unchanged. When position streaming resumes, the actuator may move "
-            "to the same slider target in the new coordinate system.\n\n"
-            "Set low speed and torque before continuing. Proceed?",
+            "校准中位",
+            "将所选舵机的当前位置设为中位。\n\n"
+            "滑块数值不会改变。恢复位置控制后，舵机可能会按新坐标系移动到滑块目标位置。\n\n"
+            "请先将速度和力矩调低。确定继续吗？",
             parent=self,
         )
         if not confirmed:
@@ -554,18 +557,18 @@ class App(tk.Tk):
         def worker():
             try:
                 self.control_paused = True
-                self.set_status("Calibrating middle position… waiting for ACK")
-                self.log(f"[TX] CALIBRATE_MID sent (ch={ch}, slider={self.slider_vars[ch].get():.3f})")
+                self.set_status("正在校准中位…等待确认")
+                self.log(f"[TX] 已发送 CALIBRATE_MID（通道={ch}，滑块={self.slider_vars[ch].get():.3f}）")
                 ack = self.hand.calibrate_mid(ch)
                 self.log(
-                    f"[ACK] CALIBRATE_MID: id={ack['Servo ID']} "
-                    f"present_raw={ack['Present Raw']} present_u16={ack['Present U16']} "
-                    f"slider_unchanged={self.slider_vars[ch].get():.3f}"
+                    f"[ACK] CALIBRATE_MID：舵机 ID={ack['Servo ID']}，"
+                    f"当前位置原始值={ack['Present Raw']}，当前位置 16 位值={ack['Present U16']}，"
+                    f"滑块未变={self.slider_vars[ch].get():.3f}"
                 )
-                self.set_status("Middle calibration complete; resuming unchanged slider target")
+                self.set_status("中位校准完成，将恢复原滑块目标位置")
             except Exception as e:
-                self.log(f"[err] CALIBRATE_MID failed: {e}")
-                self.set_status("Middle calibration failed")
+                self.log(f"[错误] 中位校准失败：{e}")
+                self.set_status("中位校准失败")
             finally:
                 self.control_paused = False
 
@@ -583,36 +586,36 @@ class App(tk.Tk):
             norm_vals = [(vals[i] - j_ll[i]) / (j_ul[i] - j_ll[i]) for i in range(len(vals))]
             ## Format to 3 decimal places
             norm_vals_fmt = [round(v, 3) for v in norm_vals]
-            self.log(f"[GET_POS] {norm_vals_fmt}")
+            self.log(f"[GET_POS] 位置：{norm_vals_fmt}")
         except Exception as e:
-            self.log(f"[err] GET_POS: {e}")
+            self.log(f"[错误] 读取位置失败：{e}")
 
     def on_get_vel(self):
         if not self.hand:
             return
         try:
             vals = self.hand.get_actuator_speeds()
-            self.log(f"[GET_VEL] {list(vals)}")
+            self.log(f"[GET_VEL] 速度：{list(vals)}")
         except Exception as e:
-            self.log(f"[err] GET_VEL: {e}")
+            self.log(f"[错误] 读取速度失败：{e}")
 
     def on_get_cur(self):
         if not self.hand:
             return
         try:
             vals = self.hand.get_actuator_currents()
-            self.log(f"[GET_CURR] {list(vals)}")
+            self.log(f"[GET_CURR] 电流：{list(vals)}")
         except Exception as e:
-            self.log(f"[err] GET_CURR: {e}")
+            self.log(f"[错误] 读取电流失败：{e}")
 
     def on_get_temp(self):
         if not self.hand:
             return
         try:
             vals = self.hand.get_actuator_temperatures()
-            self.log(f"[GET_TEMP] {list(vals)}")
+            self.log(f"[GET_TEMP] 温度：{list(vals)}")
         except Exception as e:
-            self.log(f"[err] GET_TEMP: {e}")
+            self.log(f"[错误] 读取温度失败：{e}")
     
     def on_get_all(self):
         if not self.hand:
@@ -623,20 +626,20 @@ class App(tk.Tk):
             curr = self.hand.get_actuator_currents()
             temp = self.hand.get_actuator_temperatures()
             norm_pos = [round(v / 65535, 3) for v in pos]  # Normalize for display
-            self.log(f"[GET_ALL] POS: {norm_pos} | VEL: {list(vel)} | CURR: {list(curr)} | TEMP: {list(temp)}")
+            self.log(f"[GET_ALL] 位置：{norm_pos} | 速度：{list(vel)} | 电流：{list(curr)} | 温度：{list(temp)}")
         except Exception as e:
-            self.log(f"[err] GET_ALL: {e}")
+            self.log(f"[错误] 读取全部数据失败：{e}")
 
     # ---- Flashing (esptool) ----
     def on_flash(self):
         bin_path = filedialog.askopenfilename(
-            parent=self, title="Select ESP32 firmware (.bin)",
-            filetypes=[("BIN files", "*.bin"), ("All files", "*.*")]
+            parent=self, title="选择 ESP32 固件 (.bin)",
+            filetypes=[("BIN 文件", "*.bin"), ("所有文件", "*.*")]
         )
         if not bin_path:
             return
         # pick a port (use connected one if available)
-        port = self.port_var.get().strip() or simpledialog.askstring("Port", "Enter serial port:", parent=self)
+        port = self.port_var.get().strip() or simpledialog.askstring("串口", "请输入串口名称：", parent=self)
         if not port:
             return
 
@@ -644,7 +647,7 @@ class App(tk.Tk):
         offset = "0x10000"
 
         if self.hand:
-            self.log("[flash] Closing serial before flashing…")
+            self.log("[烧录] 正在关闭串口…")
             self.on_disconnect()
 
         def worker():
@@ -658,19 +661,19 @@ class App(tk.Tk):
                     self.log(line.rstrip("\n"))
                 rc = proc.wait()
                 if rc == 0:
-                    self.log("[flash] Flash complete.")
-                    self.after(0, lambda: messagebox.showinfo("Success", "Firmware flashed successfully."))
+                    self.log("[烧录] 烧录完成")
+                    self.after(0, lambda: messagebox.showinfo("成功", "固件烧录成功。"))
                 else:
-                    self.log(f"[flash] esptool exited with code {rc}")
-                    self.after(0, lambda rc=rc: messagebox.showerror("Flash failed", f"esptool exited with code {rc}"))
+                    self.log(f"[烧录] esptool 退出码：{rc}")
+                    self.after(0, lambda rc=rc: messagebox.showerror("烧录失败", f"esptool 退出码：{rc}"))
             except Exception as e:
-                self.log(f"[flash] {e}")
-                self.after(0, lambda e=e: messagebox.showerror("Flash failed", str(e)))
+                self.log(f"[烧录] {e}")
+                self.after(0, lambda e=e: messagebox.showerror("烧录失败", str(e)))
 
             max_attempts = 3
             for attempt in range(1, max_attempts + 1):
                 time.sleep(1.5) 
-                self.log(f"[flash] Reconnect attempt {attempt}...")
+                self.log(f"[烧录] 第 {attempt} 次尝试重新连接…")
                 result = {'ok': False}
                 done = threading.Event()
                 def _do_connect():
@@ -678,20 +681,20 @@ class App(tk.Tk):
                         ok = bool(self.on_connect()) 
                         result['ok'] = ok
                     except Exception as e:
-                        self.log(f"[flash] on_connect raised: {e}")
+                        self.log(f"[烧录] 重新连接时出错：{e}")
                         result['ok'] = False
                     finally:
                         done.set()
                 self.after(0, _do_connect)
                 if not done.wait(3.0): 
-                    self.log("[flash] connect timed out")
+                    self.log("[烧录] 重新连接超时")
                     continue                   
                 if result['ok']:
-                    self.log("[flash] Reconnected ✅")
+                    self.log("[烧录] 已重新连接 ✅")
                     break                     
             else:
-                self.after(0, lambda: self.set_status("Reconnect failed after flashing"))
-                self.after(0, lambda: messagebox.showerror("Flash failed", "Reconnect failed after flashing"))
+                self.after(0, lambda: self.set_status("烧录后重新连接失败"))
+                self.after(0, lambda: messagebox.showerror("连接失败", "固件烧录完成，但重新连接失败。"))
 
         threading.Thread(target=worker, daemon=True).start()
 
