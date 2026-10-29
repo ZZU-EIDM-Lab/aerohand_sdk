@@ -247,6 +247,22 @@ class App(tk.Tk):
     def set_status(self, s: str):
         self.status_var.set(s)
 
+    @staticmethod
+    def _format_metric_values(values):
+        if values is None:
+            raise RuntimeError("未收到设备响应")
+        return "[" + ", ".join("离线" if value is None else str(value) for value in values) + "]"
+
+    def _normalized_actuations(self, values):
+        if values is None:
+            raise RuntimeError("未收到设备响应")
+        lower = self.hand.actuation_lower_limits
+        upper = self.hand.actuation_upper_limits
+        return [
+            None if value is None else round((value - lower[i]) / (upper[i] - lower[i]), 3)
+            for i, value in enumerate(values)
+        ]
+
     def _refresh_ports(self):
         ports = [p.device for p in list_ports.comports()]
         self.port_cmb["values"] = ports
@@ -589,13 +605,8 @@ class App(tk.Tk):
             return
         try:
             vals = self.hand.get_actuations()
-            j_ll = self.hand.actuation_lower_limits
-            j_ul = self.hand.actuation_upper_limits
-            # Convert to normalized 0.0-1.0 range for display
-            norm_vals = [(vals[i] - j_ll[i]) / (j_ul[i] - j_ll[i]) for i in range(len(vals))]
-            ## Format to 3 decimal places
-            norm_vals_fmt = [round(v, 3) for v in norm_vals]
-            self.log(f"[GET_POS] 位置：{norm_vals_fmt}")
+            norm_vals = self._normalized_actuations(vals)
+            self.log(f"[GET_POS] 位置：{self._format_metric_values(norm_vals)}")
         except Exception as e:
             self.log(f"[错误] 读取位置失败：{e}")
 
@@ -604,7 +615,7 @@ class App(tk.Tk):
             return
         try:
             vals = self.hand.get_actuator_speeds()
-            self.log(f"[GET_VEL] 速度：{list(vals)}")
+            self.log(f"[GET_VEL] 速度：{self._format_metric_values(vals)}")
         except Exception as e:
             self.log(f"[错误] 读取速度失败：{e}")
 
@@ -613,7 +624,7 @@ class App(tk.Tk):
             return
         try:
             vals = self.hand.get_actuator_currents()
-            self.log(f"[GET_CURR] 电流：{list(vals)}")
+            self.log(f"[GET_CURR] 电流：{self._format_metric_values(vals)}")
         except Exception as e:
             self.log(f"[错误] 读取电流失败：{e}")
 
@@ -622,7 +633,7 @@ class App(tk.Tk):
             return
         try:
             vals = self.hand.get_actuator_temperatures()
-            self.log(f"[GET_TEMP] 温度：{list(vals)}")
+            self.log(f"[GET_TEMP] 温度：{self._format_metric_values(vals)}")
         except Exception as e:
             self.log(f"[错误] 读取温度失败：{e}")
     
@@ -634,8 +645,13 @@ class App(tk.Tk):
             vel = self.hand.get_actuator_speeds()
             curr = self.hand.get_actuator_currents()
             temp = self.hand.get_actuator_temperatures()
-            norm_pos = [round(v / 65535, 3) for v in pos]  # Normalize for display
-            self.log(f"[GET_ALL] 位置：{norm_pos} | 速度：{list(vel)} | 电流：{list(curr)} | 温度：{list(temp)}")
+            norm_pos = self._normalized_actuations(pos)
+            self.log(
+                f"[GET_ALL] 位置：{self._format_metric_values(norm_pos)} | "
+                f"速度：{self._format_metric_values(vel)} | "
+                f"电流：{self._format_metric_values(curr)} | "
+                f"温度：{self._format_metric_values(temp)}"
+            )
         except Exception as e:
             self.log(f"[错误] 读取全部数据失败：{e}")
 

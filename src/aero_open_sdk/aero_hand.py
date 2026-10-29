@@ -46,9 +46,23 @@ SET_SPE = 0x31
 SET_TOR = 0x32
 
 _UINT16_MAX = 65535
+_METRICS_VALIDITY_FLAG = 0x80
 
 _RAD_TO_DEG = 180.0 / 3.141592653589793
 _DEG_TO_RAD = 3.141592653589793 / 180.0
+
+
+def _metric_channels(data: tuple[int, ...]) -> list[int | None]:
+    """Decode per-servo validity from a metrics frame's second byte.
+
+    Older firmware uses zero in that byte and has no validity information.
+    """
+    flags = data[1]
+    return [
+        value if not (flags & _METRICS_VALIDITY_FLAG) or (flags & (1 << i)) else None
+        for i, value in enumerate(data[2:])
+    ]
+
 
 class AeroHand:
     def __init__(self, port=None, baudrate=921600):
@@ -407,11 +421,12 @@ class AeroHand:
         """
         Get the joint positions from the hand in the compact 7 joint representation.
         Returns:
-            list: A list of 7 joint positions. (degrees)
+            list | None: Seven joint positions (degrees), or None if any
+            actuator did not reply.
         """
         actuations = self.get_actuations()
         ## If there was an error getting actuations, return None
-        if actuations is None:
+        if actuations is None or any(value is None for value in actuations):
             return None
         ## Convert to radians
         actuations = [act * _DEG_TO_RAD for act in actuations]
@@ -428,7 +443,7 @@ class AeroHand:
         """
         Get the actuation values from the hand.
         Returns:
-            list: A list of 7 actuations. (degrees)
+            list: Seven actuations (degrees); a missing servo is None.
         """
         ## Clear input buffer to avoid stale data
         self.ser.reset_input_buffer()
@@ -449,13 +464,14 @@ class AeroHand:
             print(f"Invalid response from hand in get_actuations. Expected {GET_POS}, got {data[0]}")
             self.ser.reset_input_buffer()
             return None
-        positions_uint16 = data[2:]
+        positions_uint16 = _metric_channels(data)
         ## Convert to degrees
         positions = [
+            None if value is None else
             self.actuation_lower_limits[i]
-            + (positions_uint16[i] / _UINT16_MAX)
+            + (value / _UINT16_MAX)
             * (self.actuation_upper_limits[i] - self.actuation_lower_limits[i])
-            for i in range(7)
+            for i, value in enumerate(positions_uint16)
         ]
         return positions
 
@@ -463,7 +479,7 @@ class AeroHand:
         """
         Get the actuator currents from the hand.
         Returns:
-            list: A list of 7 actuator currents. (mA)
+            list: Seven actuator currents (mA); a missing servo is None.
         """
         ## Clear input buffer to avoid stale data
         self.ser.reset_input_buffer()
@@ -485,14 +501,14 @@ class AeroHand:
             self.ser.reset_input_buffer()
             return None
         ## Convert to mA using the conversion factor 1 unit = 6.5 mA as per Feetech documentation
-        currents_mA = [val * 6.5 for val in data[2:]]
+        currents_mA = [None if val is None else val * 6.5 for val in _metric_channels(data)]
         return currents_mA
 
     def get_actuator_temperatures(self):
         """
         Get the actuator temperatures from the hand.
         Returns:
-            list: A list of 7 actuator temperatures. (Degree Celsius)
+            list: Seven actuator temperatures (°C); a missing servo is None.
         """
         self.ser.reset_input_buffer()
 
@@ -513,14 +529,14 @@ class AeroHand:
             self.ser.reset_input_buffer()
             return None
         ## Temperatures are in degree Celsius directly
-        temperatures = [float(val) for val in data[2:]]
+        temperatures = [None if val is None else float(val) for val in _metric_channels(data)]
         return temperatures
 
     def get_actuator_speeds(self):
         """
         Get the actuator speeds from the hand.
         Returns:
-            list: A list of 7 actuator speeds. (RPM)
+            list: Seven actuator speeds (RPM); a missing servo is None.
         """
         self.ser.reset_input_buffer()
 
@@ -541,7 +557,7 @@ class AeroHand:
             self.ser.reset_input_buffer()
             return None
         ## Convert to RPM using the conversion factor 1 unit = 0.732 RPM as per Feetech documentation
-        speeds_rpm = [val * 0.732 for val in data[2:]]
+        speeds_rpm = [None if val is None else val * 0.732 for val in _metric_channels(data)]
         return speeds_rpm
 
     def close(self):
