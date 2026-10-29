@@ -13,6 +13,8 @@
 克隆本仓库并进入项目目录后执行：
 
 ```bash
+git clone https://github.com/lava-xa/aerohand_sdk.git
+cd aerohand_sdk
 uv sync
 uv run aero-open-gui
 ```
