@@ -1,250 +1,68 @@
-<p align="center">
-  <img alt="Aero Hand Open by Chestnut Robotics" src="assets/logo.png" width="30%">
-  <br/><br/>
-</p>
+# Aero Hand Open SDK
 
-<div align="center">
+基于 [Chestnut Robotics 的 Aero Hand Open](https://github.com/Chestnut-Robotics/aero-hand-open) 改造的 Python 上位机项目，包含串口控制 SDK、中文 GUI 和示例。上游版权及许可见 [NOTICE](NOTICE) 和 [LICENSE](LICENSE)。
 
-[![Python Version](https://img.shields.io/pypi/pyversions/aero-open-sdk)](https://www.python.org/downloads/)
-[![PyPI Version](https://img.shields.io/pypi/v/aero-open-sdk)](https://pypi.org/project/aero-open-sdk/)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/pypi/status/aero-open-sdk)](https://pypi.org/project/aero-open-sdk/)
-[![Build](https://img.shields.io/github/actions/workflow/status/chestnut-robotics/aero-open-sdk/test.yml?branch=main)](https://github.com/chestnut-robotics/aero-open-sdk/actions)
-[![Chestnut Robotics](https://img.shields.io/badge/Developed%20by-Chestnut%20Robotics-0A66C2)](https://chestnut.bot)
+## 环境要求
 
-</div>
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- Python 3.10 或更新版本（仓库的 `.python-version` 指定 3.10，uv 可自动准备）
+- GUI 运行环境需要 Tkinter 和图形桌面；串口控制需要已连接的 Aero Hand 设备
 
-<h2 align="center">
-  <p>Aero Open SDK — Python interface for Chestnut Robotics’ Aero Hand Open</p>
-</h2>
+## 安装与运行
 
-<div align="center">
-  <img src="assets/banner.jpg" alt="Aero Hand Demo" title="Aero Hand in action" width="70%"/>
-  <p><strong>Aero Open Hand</strong> is a 7-DoF tendon-driven robotic hand for dexterous manipulation and research.</p>
-  <p>The SDK enables full control via Python. Perform homing, calibration, and precise motion control with ease.</p>
-</div>
-
----
-
-## ⚙️ Installation
-
-The SDK is currently tested for Python 3.10 and above.
-
-### 📦 Install via pip
+克隆本仓库并进入项目目录后执行：
 
 ```bash
-pip install aero-open-sdk
+uv sync
+uv run aero-open-gui
 ```
 
-### 🧩 Install from source (editable mode)
+`uv sync` 会按 `pyproject.toml` 和提交的 `uv.lock` 创建 `.venv` 并安装项目及依赖。需要严格复现锁文件时使用 `uv sync --locked`。更新依赖后运行 `uv lock`，并提交新的 `uv.lock`。
 
-1. Clone the repository to your local machine:
-   ```bash
-   git clone https://github.com/chestnut-robotics/aero-hand-open.git
-   ```
+在本工作区中也可以执行上级目录的 `./host.sh` 启动 GUI。该脚本不属于本仓库；单独克隆时请用上面的 `uv run aero-open-gui`。
 
-2. Navigate to the cloned repository directory:
-   ```bash
-   cd sdk
-   ```
+GUI 使用 Python 自带的 Tkinter。若出现 `No module named tkinter`，请给实际使用的 Python 安装对应的 Tk/Tcl 支持；在 Debian/Ubuntu 使用系统 Python 时通常需要 `python3-tk`。Tkinter 无法通过 `uv sync` 作为 PyPI 包安装。
 
-3. Install the package in editable mode:
-   ```bash
-   pip install -e .
-   ```
+## 串口连接
 
----
+GUI 内刷新并选择设备串口。Linux 常见设备名为 `/dev/ttyACM0` 或 `/dev/ttyUSB0`，可用 `ls -l /dev/serial/by-id/` 查找稳定路径。SDK 的 `AeroHand()` 在 Linux 上会尝试自动检测 Espressif USB JTAG 串口；也可以显式指定端口：
 
-## 🖥️ One-Time Setup
-
-When setting up your hand for the first time, our setup GUI helps you configure motor IDs and test motor connections.
-
-After installation, launch the Setup GUI with:
-
-```bash
-aero-open-gui
-```
-
-This provides an interactive interface to configure your hand.
-
----
-
-## 🔌 Serial Port Setup
-
-Aero Hand connects to the host PC via a serial (USB) interface.
-To operate the SDK, you must specify the correct serial port for your device.
-
-### 🐧 Linux
-
-Most Linux systems assign the device path as `/dev/ttyACM0` or `/dev/ttyUSB0`. You can list connected serial devices with:
-
-```bash
-ls /dev/ttyACM* /dev/ttyUSB*
-```
-
-**💡 Persistent Device Path (Recommended)**
-
-Device names like `/dev/ttyUSB0` can change each time you reconnect.
-
-To get a persistent name, use the by-id symlink instead:
-
-```bash
-ls -l /dev/serial/by-id/
-```
-
-This will show you a list of connected serial devices with more descriptive names. Look for the one that corresponds to your Aero Hand. Which will look something like:
-```bash
-usb-Espressif_USB_JTAG_serial_debug_unit_D8:3B:DA:45:C8:1C-if00
-```
-Then initialize your hand using that path:
 ```python
 from aero_open_sdk.aero_hand import AeroHand
 
-aero_hand = AeroHand(
-  port="/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_D8:3B:DA:45:C8:1C-if00"
-)
-```
-✅ This ensures your connection always points to the correct device, even if you unplug and replug the hand or change the USB port.
-
-### 🪟 Windows
-On Windows, the device will appear as a COM port like `COM3` or `COM4`. You can find the correct COM port by checking the Device Manager under "Ports (COM & LPT)".
-
-You can then Initialize your hand with the detected COM port:
-```python
-from aero_open_sdk.aero_hand import AeroHand
-aero_hand = AeroHand(port="COM3")
-```
-**💡 Making the COM Port Persistent**
-
-Windows does not have a /by-id/ system like Linux, so the COM number can change if you plug the device into a different USB port.
-
-To make it permanent, you can assign a fixed COM number:
-1. Plug in the Aero Hand and open Device Manager.
-2. Find it under Ports (COM & LPT).
-3. Right-click → Properties → Port Settings → Advanced.
-4. In COM Port Number, select an unused port (e.g., COM5).
-5. Click OK to save.
-
-You can now always use this COM port when initializing the SDK.
-
----
-
-
-## 💡 Examples
-
-To integrate the SDK into your own code, refer to the `examples` folder for sample files demonstrating basic usage.
-
----
-
-## 🧰 Troubleshooting
-
-### 1. Installation Fails (`pip install` error)
-
-If installation fails, try the following steps:
-
-- Check your Python version:
-
-    Make sure you have Python 3.10 or higher installed.
-
-- 🔧 Upgrade pip to the latest version:
-
-    Our package requires an up-to-date version of pip.
-
-    You can upgrade pip with:
-    ```bash
-    pip install --upgrade pip
-    ```
-
-On Windows, if you see error like "pip is not recognized", use the `py` launcher command instead:
-
-    ```bash
-    py -m pip install --upgrade pip
-    ```
-
-### 2. Path Mismatch on Windows
-
-- You may not have the Python Scripts path added to your system PATH environment variable.
-
-- To fix this, you can either:
-
-  1. Add the Python Scripts directory (e.g., `C:\Users\<YourName>\AppData\Local\Programs\Python\Python310\Scripts`) to your system PATH.
-  2. Or use the `py` launcher command to launch the GUI after installation:
-      ```bash
-      py -m aero_open_sdk
-      ```
-  3. Create a virtual environment and install the package there.
-      ```bash
-      python -m venv venv
-      .\venv\Scripts\activate
-      pip install aero-open-sdk
-      aero-open-gui
-      ```
-
-### 3. Linux Troubleshooting: Serial Port Permission
-
-If you see a permission error when connecting to the serial port (e.g., `/dev/ttyACM0`), do the following:
-
-1. Find your username:
-   ```sh
-   whoami
-   ```
-2. Add your user to the `dialout` group (replace `yourusername` with the output from `whoami`):
-   ```sh
-   sudo usermod -a -G dialout yourusername
-   ```
-3. **Restart your system** (or log out and log back in).
-4. After restart, open a terminal and run:
-   ```sh
-   groups
-   ```
-   You should see your username and `dialout` listed.
-5. Try connecting to the serial port again in the GUI.
-
-If you still see permission errors, check device permissions with:
-```sh
-ls -l /dev/ttyACM0
-```
-You may need to temporarily set permissions:
-```sh
-sudo chmod 666 /dev/ttyACM0
+hand = AeroHand(port="/dev/ttyACM0")
+try:
+    print(hand.get_actuations())
+finally:
+    hand.close()
 ```
 
-## 💬 Support
+Windows 请传入对应的 `COM` 端口。Linux 如遇串口权限错误，请检查设备所属用户组，必要时将当前用户加入 `dialout` 并重新登录。
 
-If you encounter issues or have feature requests:
-- Open a [GitHub Issue](https://github.com/chestnut-robotics/aero-hand-open/tree/main/sdk/issues)
-- Contact us at **contact@chestnut.bot**
+GUI 的“烧录固件”功能依赖随项目安装的 `esptool`。操作前请确认所选 `.bin` 文件和烧录地址适合目标 ESP32；固件源码及构建流程不在此 SDK 仓库中。
 
----
+## 示例
 
-## 🤝 Contribution
+`examples/` 包含回零、关节控制、舵机微调和状态读取等示例。它们会访问真实设备，运行前先确认串口和机械运动范围。例如：
 
-We welcome community contributions!
+```bash
+uv run python examples/get_info.py
+```
 
-If you'd like to improve the SDK, fix bugs, or add new features:
+键盘控制示例额外使用 `pynput`：
 
-1. Fork this repository.
-2. Create a new branch for your changes.
-    ```bash
-    git checkout -b feature/your-feature-name
-    ```
+```bash
+uv sync --extra examples
+uv run --extra examples python examples/power_grasp.py
+```
 
-3. Commit your changes with clear messages.
+## 构建与发布
 
-4. Push your branch to your fork.
+```bash
+uv sync --locked
+uv build
+```
 
-5. Open a Pull Request (PR) describing your updates.
+构建产物位于 `dist/`，已被 Git 忽略。向 GitHub 发布源码时提交 `pyproject.toml`、`uv.lock`、`src/`、`examples/`、README、LICENSE 和 NOTICE；不要提交 `.venv/` 或 `dist/`。`其他文件/` 保存了原有的模型和硬件参考文件，不会进入 Python wheel。该目录中两份 STEP 模型各约 53 MiB，推送到 GitHub 时会收到大文件警告；若计划长期维护这些模型，可考虑 Git LFS。
 
-
----
-
-## ⚖️ License
-
-This project is licensed under the **Apache License 2.0**.
-
-
-<div align="center">
-If you find this project useful, please give it a star! ⭐
-
-Built with ❤️ by Chestnut Robotics
-</div>
+本仓库使用 [Apache License 2.0](LICENSE)。项目与上游的关系及原始版权声明见 [NOTICE](NOTICE)。

@@ -1,12 +1,9 @@
-## Env files
-.venv
-
-## Cache files
-__pycache__
-*.egg-info
-
-## Test folders
-firmware
-esp32-hand-controller
-
-uvconfig.toml
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.DS_Store

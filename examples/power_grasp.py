@@ -21,16 +21,14 @@ Press the SPACE key to toggle between open and close grip poses.
 import time
 from aero_open_sdk.aero_hand import AeroHand
 
-## This example requires the 'pynput' library.
-## You can install it via pip:
-##     pip install pynput
+## Install the optional keyboard dependency with: uv sync --extra examples
 try:
     from pynput import keyboard
 except ModuleNotFoundError:
     raise SystemExit(
         "\nERROR: 'pynput' is not installed.\n"
         "Install it using:\n"
-        "    pip install pynput\n"
+        "    uv sync --extra examples\n"
     )
 
 class KeyboardController:

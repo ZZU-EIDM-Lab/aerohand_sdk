@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-firmware_gui.py - Minimal GUI for Aero Hand (16-byte serial protocol)
+gui.py - Aero Hand setup GUI (16-byte serial protocol)
 
 A simple Tkinter GUI to control the Aero Hand via serial port:
 - "Start Homing": sends a HOMING command 16 byte packet to the ESP.
@@ -25,12 +25,11 @@ A simple Tkinter GUI to control the Aero Hand via serial port:
 - RX log window to show incoming parsed serial data and status messages.
 - Status bar for connection status and info.
 - Adjustable TX rate (default 40 Hz).
-- Auto-detects merged vs app-only .bin files for flashing.
-- Handles esptool installation if missing.
+- Uses the esptool installed with this project for flashing.
 - Uses pyserial for serial communication.
 """
 import sys
-import os
+from importlib.resources import files
 import threading
 import time
 import subprocess
@@ -69,6 +68,8 @@ SLIDER_LABELS = [
     "无名指",
     "小指",
 ]
+# Keep the GUI target aligned with the firmware's post-homing channel 0 target.
+THUMB_ABDUCTION_HOME_POSITION = 0.8
 
 class App(tk.Tk):
     def __init__(self):
@@ -85,8 +86,8 @@ class App(tk.Tk):
             self.attributes("-zoomed", True)
 
         try:
-            icon_path = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "logo.png")
-            icon_img = tk.PhotoImage(file=icon_path)
+            icon_path = files("aero_open_sdk").joinpath("assets", "logo.png")
+            icon_img = tk.PhotoImage(file=str(icon_path))
             self.iconphoto(True, icon_img)
         except Exception as e:
             print(f"设置窗口图标失败：{e}")
@@ -196,7 +197,7 @@ class App(tk.Tk):
             ttk.Label(row, text=f"{i} – {name}", width=22).pack(side=tk.LEFT, padx=(0, 8))
             min_lbl = ttk.Label(row, text="0.000", width=8, font=mono_font)
             min_lbl.pack(side=tk.LEFT)
-            var = tk.DoubleVar(value=0.0)
+            var = tk.DoubleVar(value=THUMB_ABDUCTION_HOME_POSITION if i == 0 else 0.0)
             self.slider_vars.append(var)
             scale = tk.Scale(row, from_=0.0, to=1.0, orient=tk.HORIZONTAL, length=600,
                               resolution=0.001, variable=var, showvalue=True, font=mono_font)
@@ -381,23 +382,31 @@ class App(tk.Tk):
     def on_homing(self):
         if not self.hand:
             return
+        self.control_paused = True
 
         def worker():
+            completion_scheduled = False
             try:
-                self.control_paused = True
                 self.set_status("正在回零…等待确认")
                 self.log("[TX] 已发送 HOMING (0x01)，等待 16 字节确认包…")
                 ok = self.hand.send_homing(timeout_s=175.0)
                 if ok:
-                    self.log("[ACK] 回零完成")
-                    self.set_status("回零完成")
+                    self.after(0, self._finish_homing)
+                    completion_scheduled = True
             except Exception as e:
                 self.log(f"[错误] 回零失败：{e}")
                 self.set_status("回零失败")
             finally:
-                self.control_paused = False
+                if not completion_scheduled:
+                    self.control_paused = False
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_homing(self):
+        self.slider_vars[0].set(THUMB_ABDUCTION_HOME_POSITION)
+        self.log("[ACK] 回零完成，拇指外展已设为 0.8")
+        self.set_status("回零完成，拇指外展已设为 0.8")
+        self.control_paused = False
 
     def on_set_id(self):
         if not self.hand:
